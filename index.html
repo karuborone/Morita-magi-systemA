@@ -1,0 +1,252 @@
+
+import React, { useState, useCallback } from 'react';
+import { deliberateWithMagi } from './services/geminiService';
+import { MagiNode } from './components/MagiNode';
+import { DeliberationChart } from './components/DeliberationChart';
+import { MagiResponse, MagiStatus, MagiResult } from './types';
+
+const App: React.FC = () => {
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<MagiStatus>('IDLE');
+  const [results, setResults] = useState<MagiResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const startDeliberation = useCallback(async () => {
+    if (!query.trim() || status === 'THINKING') return;
+    
+    setStatus('THINKING');
+    setResults(null);
+    setError(null);
+
+    try {
+      const response = await deliberateWithMagi(query);
+      setTimeout(() => {
+        setResults(response);
+        setStatus('RESOLVED');
+      }, 1500);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'System linkage failure');
+      setStatus('ERROR');
+    }
+  }, [query, status]);
+
+  const getIntegratedResult = () => {
+    if (!results) return null;
+    const nodes = [results.melchior, results.balthasar, results.casper];
+    const approved = nodes.filter(n => n.result === MagiResult.APPROVED);
+    const rejected = nodes.filter(n => n.result === MagiResult.REJECTED);
+
+    let title = "";
+    let color = "";
+    let bgColor = "";
+    let conditions: string[] = [];
+
+    if (approved.length === 3) {
+      title = "UNANIMOUS APPROVAL";
+      color = "text-[#00ff66]";
+      bgColor = "bg-[#00ff6611]";
+      conditions = approved.map(n => n.condition).filter(Boolean) as string[];
+    } else if (approved.length === 2) {
+      title = "CONDITIONAL APPROVAL";
+      color = "text-[#ccff00]";
+      bgColor = "bg-[#ccff0011]";
+      conditions = [
+        ...rejected.map(n => `CRITICAL: ${n.condition}`),
+        ...approved.map(n => `PRECAUTION: ${n.condition}`)
+      ];
+    } else if (approved.length === 1) {
+      title = "CONDITIONAL REJECTION";
+      color = "text-[#ff9900]";
+      bgColor = "bg-[#ff990011]";
+      conditions = rejected.map(n => `BLOCKER: ${n.condition}`);
+    } else {
+      title = "TOTAL REJECTION";
+      color = "text-[#ff3300]";
+      bgColor = "bg-[#ff330011]";
+      conditions = rejected.map(n => n.condition).filter(Boolean) as string[];
+    }
+
+    return { title, color, bgColor, conditions };
+  };
+
+  const finalResult = getIntegratedResult();
+
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-start py-8 px-4 md:px-12 text-[#ff6600] relative overflow-hidden">
+      
+      {/* Background technical labels */}
+      <div className="fixed top-20 left-4 text-[8px] opacity-20 vertical-text hidden md:block">
+        PRIORITY_LEVEL_A // PROTOCOL_601 // BIOS_SYNC_STABLE
+      </div>
+      <div className="fixed top-20 right-4 text-[8px] opacity-20 vertical-text hidden md:block">
+        GEHIRN_ARCH // MODEL_B-02 // SYS_DENSITY_92%
+      </div>
+
+      <header className="mb-8 text-center z-10 w-full">
+        <div className="inline-block border-2 border-[#ff6600] px-8 py-2 relative">
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#0d0b0a] px-2 text-[10px] tracking-widest">NERV_HQ_MAINFRAME</div>
+          <h1 className="text-4xl md:text-6xl font-black tracking-[0.4em] uppercase drop-shadow-[0_0_15px_rgba(255,102,0,0.5)]">
+            MAGI SYSTEM
+          </h1>
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-[#0d0b0a] px-2 text-[8px] tracking-[0.8em] opacity-80 uppercase">
+            SUPERCOMPUTER_INTERFACE_V4.4
+          </div>
+        </div>
+      </header>
+
+      <main className="z-10 w-full max-w-7xl flex flex-col items-center">
+        
+        {/* Main Status Display Panel */}
+        <div className="mb-12 w-full max-w-5xl flex flex-col items-center">
+          <div className="w-full flex justify-between text-[8px] opacity-40 px-2 border-b border-[#ff660022] pb-1 mb-4">
+            <span>DELIBERATION_ID: {Math.random().toString(36).substring(7).toUpperCase()}</span>
+            <span>DATE: 2015.06.22</span>
+            <span>SECURITY_LEVEL: TOP_SECRET</span>
+          </div>
+
+          <div className="min-h-32 flex flex-col items-center justify-center text-center w-full bg-black/40 border border-[#ff660022] p-4 relative">
+            {/* Corner brackets */}
+            <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[#ff660044]"></div>
+            <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[#ff660044]"></div>
+            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#ff660044]"></div>
+            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#ff660044]"></div>
+
+            {error && <div className="text-[#ff3300] animate-pulse font-bold tracking-widest">ALERT: {error}</div>}
+
+            {status === 'RESOLVED' && finalResult && (
+              <div className="flex flex-col items-center animate-in fade-in zoom-in duration-500 w-full">
+                <div className={`${finalResult.bgColor} w-full py-4 px-2 mb-4 border-y border-current transition-colors duration-1000`}>
+                  <div className={`text-4xl md:text-6xl font-black tracking-[0.3em] ${finalResult.color} drop-shadow-lg`}>
+                    {finalResult.title}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-4xl px-4">
+                  {finalResult.conditions.map((c, i) => (
+                    <div key={i} className="text-[10px] bg-[#ff66000a] border-l-2 border-[#ff6600] p-3 text-left font-mono animate-in slide-in-from-bottom duration-500" style={{animationDelay: `${i*100}ms`}}>
+                      <div className="opacity-40 text-[7px] mb-1">CONDITION_PARM_{i+1}</div>
+                      {c}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {status === 'THINKING' && (
+              <div className="text-sm tracking-[0.8em] animate-pulse flex flex-col items-center">
+                <span className="text-xl font-black mb-4">THINKING</span>
+                <div className="grid grid-cols-8 gap-1 mb-4">
+                  {Array.from({length: 24}).map((_, i) => (
+                    <div key={i} className="w-4 h-4 bg-[#ff660022] animate-pulse" style={{animationDelay: `${i*50}ms`}}></div>
+                  ))}
+                </div>
+                <span className="text-[10px] opacity-60">SYNCHRONIZING BIO-DIGITAL CIRCUITRY...</span>
+              </div>
+            )}
+
+            {status === 'IDLE' && (
+              <div className="opacity-30 flex flex-col items-center">
+                <div className="w-16 h-16 border-2 border-dashed border-[#ff6600] rounded-full animate-spin duration-[10s] mb-4"></div>
+                <div className="text-xs tracking-[0.5em]">SYSTEM STANDBY // INPUT TOPIC TO COMMENCE</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Node Layout Area */}
+        <div className="flex flex-col items-center w-full gap-12 mb-12">
+          <div className="flex flex-wrap justify-center gap-6 md:gap-10 w-full">
+            <MagiNode id="1" name="MELCHIOR-1" role="Scientist" status={status} data={results?.melchior ?? null} delay={0} />
+            <MagiNode id="2" name="BALTHASAR-2" role="Mother" status={status} data={results?.balthasar ?? null} delay={300} />
+            <MagiNode id="3" name="CASPER-3" role="Woman" status={status} data={results?.casper ?? null} delay={600} />
+          </div>
+
+          {/* Analysis Section */}
+          <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-3 gap-8 items-center bg-black/40 border border-[#ff660011] p-8 rounded-sm relative">
+             {/* Decorative label */}
+            <div className="absolute -top-3 left-8 bg-[#0d0b0a] px-2 text-[10px] tracking-widest border border-[#ff660033]">MAGI_ANALYSIS_MODAL</div>
+
+            <div className="lg:col-span-2 flex justify-center">
+              <DeliberationChart results={results} isVisible={status === 'RESOLVED'} />
+            </div>
+            
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4 w-full text-[10px] uppercase tracking-widest font-bold">
+                <div className="p-1 border-b border-[#ff660033] opacity-60 text-center mb-2">PROBABILITY_MATRIX</div>
+                {[
+                  { label: 'LOGIC', node: results?.melchior, color: 'text-[#00ff66]', bar: 'bg-[#00ff66]' },
+                  { label: 'ETHICS', node: results?.balthasar, color: 'text-[#ccff00]', bar: 'bg-[#ccff00]' },
+                  { label: 'INTUITION', node: results?.casper, color: 'text-[#ff9900]', bar: 'bg-[#ff9900]' }
+                ].map((item, i) => (
+                  <div key={i} className="flex flex-col gap-1 bg-black/20 p-2 border border-white/5">
+                    <div className="flex justify-between items-center">
+                      <span className="opacity-60 text-[8px]">{item.label}</span>
+                      <span className={`${item.node ? (item.node.result === MagiResult.APPROVED ? 'text-[#00ff66]' : 'text-[#ff3300]') : 'text-[#ff6600]'} text-xs`}>
+                        {item.node ? `${item.node.confidenceScore}%` : '--%'}
+                      </span>
+                    </div>
+                    <div className="w-full h-1 bg-white/5 overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-1000 ${item.node ? (item.node.result === MagiResult.APPROVED ? 'bg-[#00ff66]' : 'bg-[#ff3300]') : 'bg-current opacity-20'}`} 
+                        style={{ width: item.node ? `${item.node.confidenceScore}%` : '0%' }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {status === 'RESOLVED' && (
+                <div className="p-3 bg-white/5 border border-white/10 text-[8px] font-mono leading-relaxed opacity-50">
+                  <div className="text-[#ff6600] mb-1 font-bold">SYSLOG:</div>
+                  >>> ANALYSIS COMPLETE<br/>
+                  >>> NEURAL SYNC: OPTIMAL<br/>
+                  >>> CONSENSUS REACHED via PROTOCOL_EVA_1.3<br/>
+                  >>> ENCRYPTING RESULTS...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Input Terminal - Stylized like an EVA console */}
+        <div className="w-full max-w-4xl bg-[#1a1512] p-1 border-t-4 border-[#ff6600] shadow-[0_-10px_30px_rgba(255,102,0,0.15)] mt-8">
+          <div className="flex flex-col md:flex-row gap-0">
+            <div className="bg-black flex items-center px-4 border-r border-[#ff660033]">
+              <span className="text-[10px] font-bold tracking-[0.3em] opacity-40">INPUT:</span>
+            </div>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && startDeliberation()}
+              placeholder="ENTER TOPIC FOR DELIBERATION..."
+              className="flex-grow bg-[#000] p-5 text-[#ff6600] font-mono placeholder-[#ff660033] focus:outline-none transition-colors uppercase text-sm border-b md:border-b-0 md:border-r border-[#ff660033]"
+              disabled={status === 'THINKING'}
+            />
+            <button
+              onClick={startDeliberation}
+              disabled={status === 'THINKING' || !query.trim()}
+              className="px-12 py-5 bg-[#ff6600] text-black font-black uppercase tracking-[0.3em] hover:bg-white transition-all disabled:opacity-20 disabled:cursor-not-allowed active:scale-95 text-sm"
+            >
+              {status === 'THINKING' ? 'SYNC' : 'EXECUTE'}
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <footer className="mt-16 text-[9px] tracking-[0.5em] opacity-30 flex flex-wrap justify-center gap-10 border-t border-[#ff660011] pt-8 w-full max-w-4xl">
+        <div className="flex items-center gap-2"><div className="w-2 h-2 bg-current rotate-45"></div>NERV TECHNICAL DEPARTMENT</div>
+        <div className="flex items-center gap-2"><div className="w-2 h-2 bg-current rotate-45"></div>GEHIRN BIO-COMPUTING ARCHITECTURE</div>
+        <div className="flex items-center gap-2"><div className="w-2 h-2 bg-current rotate-45"></div>MAGI_SYSTEM_V4.4_STABLE</div>
+      </footer>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        .vertical-text { writing-mode: vertical-rl; text-orientation: mixed; }
+      `}} />
+    </div>
+  );
+};
+
+export default App;
